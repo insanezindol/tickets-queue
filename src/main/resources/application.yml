@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: tickets-queue
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: redispassword
+      lettuce:
+        pool:
+          enabled: true
+          max-active: 1000      # Redis 커넥션 풀 크기 증가
+          max-idle: 500
+          min-idle: 100
+          max-wait: 3000ms
+          time-between-eviction-runs: 60000ms
+
+server:
+  tomcat:
+    threads:
+      max: 2000           # 최대 스레드 수 증가
+      min-spare: 500      # 최소 대기 스레드 증가
+    # 커넥션 설정
+    max-connections: 100000  # 최대 연결 수
+    accept-count: 50000     # 대기 큐 크기 (너무 크면 안됨)
+    connection-timeout: 10000ms  # 연결 타임아웃 감소

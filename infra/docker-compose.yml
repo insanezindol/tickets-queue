@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: ticket-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass redispassword
+    volumes:
+      - redis_data:/data
+    networks:
+      - dev-network
+
+volumes:
+  redis_data:
+
+networks:
+  dev-network:
+    driver: bridge
