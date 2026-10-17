@@ -7,11 +7,11 @@ Kotlin Coroutines와 Redis를 활용하여 고성능의 비동기 처리를 구�
 
 ## 기술 스택 (Tech Stack)
 
-- **Language**: Kotlin 1.9 (Java 21)
-- **Framework**: Spring Boot 3.5 (Snapshot)
+- **Language**: Kotlin 2.4 (Java 21)
+- **Framework**: Spring Boot 4.1
 - **Database**: Redis (Docker)
 - **Concurrency**: Kotlin Coroutines
-- **Build Tool**: Gradle (Kotlin DSL)
+- **Build Tool**: Gradle 9 (Kotlin DSL)
 
 ## 주요 기능 (Features)
 
@@ -65,6 +65,62 @@ curl "http://localhost:8080/ticket?userId=user123"
 * `uuid`: 발급된 티켓의 고유 식별자
 * `ticketNumber`: 발급된 순서 번호
 
+## 부하 테스트 (Stress Test)
+
+[k6](https://k6.io/)를 사용하여 티켓 발급 API에 부하를 주는 스크립트가 `stress-test/stress-test.js`에 포함되어 있습니다.  
+k6를 별도로 설치하지 않고 Docker 이미지(`grafana/k6`)로 실행합니다.
+
+- **가상 사용자(VUs)**: 1,000명
+- **테스트 시간**: 30초
+- **요청**: 1 ~ 100,000 사이의 랜덤 `userId`로 `GET /ticket` 호출
+- **검증**: 응답 상태 코드가 `200`인지 확인
+
+### 1. 사전 준비
+Redis와 애플리케이션이 실행 중이어야 합니다. ([시작하기](#시작하기-getting-started) 참고)
+
+### 2. 실행
+`stress-test` 폴더에서 아래 명령어를 실행합니다.
+
+**Bash (macOS / Linux / Git Bash):**
+```bash
+cd stress-test
+docker run --rm -i grafana/k6:1.5.0 run - < stress-test.js
+```
+
+**PowerShell (Windows):**
+```powershell
+cd stress-test
+Get-Content stress-test.js | docker run --rm -i grafana/k6:1.5.0 run -
+```
+
+* 컨테이너 안에서 호스트의 애플리케이션에 접근하기 위해 `host.docker.internal:8080`을 사용합니다.
+  Linux에서는 `host.docker.internal`이 기본으로 제공되지 않으므로 `--add-host=host.docker.internal:host-gateway` 옵션을 추가하세요.
+  ```bash
+  docker run --rm -i --add-host=host.docker.internal:host-gateway grafana/k6:1.5.0 run - < stress-test.js
+  ```
+* 가상 사용자 수와 테스트 시간은 `--vus`, `--duration` 옵션으로 변경할 수 있습니다.
+  ```bash
+  docker run --rm -i grafana/k6:1.5.0 run --vus 100 --duration 10s - < stress-test.js
+  ```
+
+### 3. 결과 확인
+테스트가 끝나면 k6가 요약 결과를 출력합니다. 주요 지표는 다음과 같습니다.
+
+* `checks`: `status was 200` 검증 성공 비율
+* `http_reqs`: 총 요청 수 및 초당 요청 수(RPS)
+* `http_req_duration`: 응답 시간 (avg, p90, p95 등)
+* `http_req_failed`: 실패한 요청 비율
+
+![stress-test-result.png](stress-test-result.png)
+
+### 4. 데이터 초기화
+발급된 티켓 정보는 Redis에 남아 있으므로, 테스트를 처음 상태에서 다시 하려면 Redis 데이터를 지우고 애플리케이션을 재시작합니다.  
+(중복 발급 방지용 인메모리 캐시도 함께 초기화해야 하기 때문입니다.)
+
+```bash
+docker exec ticket-redis redis-cli -a redispassword FLUSHALL
+```
+
 ## 프로젝트 구조
 
 ```
@@ -76,5 +132,7 @@ tickets-queue/
 │   └── exception/     # 예외 처리
 ├── infra/
 │   └── docker-compose.yml  # Redis 설정
+├── stress-test/
+│   └── stress-test.js # k6 부하 테스트 스크립트
 └── build.gradle.kts   # 프로젝트 의존성 관리
 ```
